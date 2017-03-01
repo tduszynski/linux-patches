@@ -1,0 +1,152 @@
+From 138759c97b6b2f0050701f7d13ecc80f990cc50e Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tduszyns@gmail.com>
+Date: Sun, 5 Feb 2017 14:01:18 +0100
+Subject: [PATCH 4/4] iio: chemical: add dsm501 particle sensor driver bindings
+
+This patch adds bindings for dsm501 particle sensor driver.
+
+Signed-off-by: Tomasz Duszynski <tduszyns@gmail.com>
+---
+ .../devicetree/bindings/iio/chemical/dsm501.txt    | 16 +++++++
+ drivers/iio/chemical/dsm501.c                      | 52 ++++++++++++++--------
+ 2 files changed, 50 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/chemical/dsm501.txt
+
+diff --git a/Documentation/devicetree/bindings/iio/chemical/dsm501.txt b/Documentation/devicetree/bindings/iio/chemical/dsm501.txt
+new file mode 100644
+index 000000000000..126ce528f5eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/chemical/dsm501.txt
+@@ -0,0 +1,16 @@
++* DSM501 particle sensor
++
++Required properties:
++
++- compatible: should be one of:
++	      "samyoung,dsm501"
++	      "shinyei,ppd42ns"
++- data-gpios: should specify the GPIO connected to the sensor's data line, see
++	      "gpios property" in Documentation/devicetree/bindings/gpio/gpio.txt
++
++Example:
++
++dsm501 {
++	compatible = "samyoung,dsm501";
++	data-gpios = <&gpio1 28 0>;
++};
+diff --git a/drivers/iio/chemical/dsm501.c b/drivers/iio/chemical/dsm501.c
+index 7c53b8305508..2d7cb8c83252 100644
+--- a/drivers/iio/chemical/dsm501.c
++++ b/drivers/iio/chemical/dsm501.c
+@@ -16,9 +16,13 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  * GNU General Public License for more details.
+- *
+  */
+ 
++/*
++ * TODO
++ * make dsm501 number calculation better
++ * add mass concentration calculation for dsm501
++ */
+ #include <linux/delay.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/iio/iio.h>
+@@ -35,6 +39,16 @@
+ 
+ #define DSM501_DEFAULT_MEASUREMENT_TIME 30 /* seconds */
+ 
++enum {
++	DSM501,
++	PPD42NS
++};
++
++static const char * const dsm501_id_tbl[] = {
++	[DSM501] = "dsm501",
++	[PPD42NS] = "ppd42ns",
++};
++
+ struct dsm501_data {
+ 	ktime_t ts;
+ 	ktime_t low_time;
+@@ -117,26 +131,15 @@ static int dsm501_read_raw(struct iio_dev *indio_dev,
+ 			   int *val2, long mask)
+ {
+ 	struct dsm501_data *data = iio_priv(indio_dev);
+-	struct device *dev = indio_dev->dev.parent;
+-	unsigned long irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+-	int ret;
+-
+ 
+ 	switch (mask) {
+ 	case IIO_CHAN_INFO_PROCESSED:
+ 		mutex_lock(&data->lock);
+ 		data->ts = ktime_set(0, 0);
+ 
+-		ret = request_irq(data->irq, dsm501_irq, irqflags,
+-				  DSM501_IRQ_NAME, indio_dev);
+-		if (ret) {
+-			dev_err(dev, "Failed to request interrupt %d\n", data->irq);
+-			mutex_unlock(&data->lock);
+-			return ret;
+-		}
+-
++		enable_irq(data->irq);
+ 		msleep_interruptible(ktime_to_ms(data->meas_time));
+-		free_irq(data->irq, indio_dev);
++		disable_irq(data->irq);
+ 
+ 		*val = data->number_concentration(data);
+ 		mutex_unlock(&data->lock);
+@@ -161,6 +164,7 @@ static const struct iio_chan_spec dsm501_channels[] = {
+ 
+ static int dsm501_probe(struct platform_device *pdev)
+ {
++	int ret, id;
+ 	struct dsm501_data *data;
+ 	struct iio_dev *indio_dev;
+ 	struct device *dev = &pdev->dev;
+@@ -184,11 +188,23 @@ static int dsm501_probe(struct platform_device *pdev)
+ 		return data->irq;
+ 	}
+ 
++	ret = devm_request_irq(dev, data->irq, dsm501_irq,
++			       IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
++			       DSM501_IRQ_NAME, indio_dev);
++	if (ret) {
++		dev_err(dev, "Failed to request interrupt %d\n", data->irq);
++		return ret;
++	}
++	disable_irq(data->irq);
++
++	id = (int)of_device_get_match_data(dev);
+ 	data->meas_time = ktime_set(DSM501_DEFAULT_MEASUREMENT_TIME, 0);
+-	data->number_concentration = of_device_get_match_data(dev);
++	data->number_concentration = id == DSM501 ?
++				     dsm501_number_concentration :
++				     ppd42ns_number_concentration;
+ 	mutex_init(&data->lock);
+ 
+-	indio_dev->name = DSM501_DRV_NAME;
++	indio_dev->name = dsm501_id_tbl[id];
+ 	indio_dev->dev.parent = dev;
+ 	indio_dev->info = &dsm501_info;
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+@@ -201,11 +217,11 @@ static int dsm501_probe(struct platform_device *pdev)
+ static const struct of_device_id dsm501_id[] = {
+ 	{
+ 		.compatible = "samyoung,dsm501",
+-		.data = dsm501_number_concentration,
++		.data = (void *)DSM501,
+ 	},
+ 	{
+ 		.compatible = "shinyei,ppd42ns",
+-		.data = ppd42ns_number_concentration,
++		.data = (void *)PPD42NS,
+ 	},
+ 	{ }
+ };
+-- 
+2.11.1
+

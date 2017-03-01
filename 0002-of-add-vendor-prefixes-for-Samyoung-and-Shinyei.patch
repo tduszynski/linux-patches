@@ -1,0 +1,35 @@
+From 51db3687980fb6322479fa40877c6ddddf90912c Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tduszyns@gmail.com>
+Date: Sun, 5 Feb 2017 13:58:39 +0100
+Subject: [PATCH 2/4] of: add vendor prefixes for Samyoung and Shinyei
+
+This patch adds prefixes for Samyoung and Shinyei companies.
+
+Signed-off-by: Tomasz Duszynski <tduszyns@gmail.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index cf1c36616507..1a090a330674 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -252,6 +252,7 @@ rikomagic	Rikomagic Tech Corp. Ltd
+ rockchip	Fuzhou Rockchip Electronics Co., Ltd
+ samsung	Samsung Semiconductor
+ samtec	Samtec/Softing company
++samyoung Samyoung S&C Co., Ltd
+ sandisk	Sandisk Corporation
+ sbs	Smart Battery System
+ schindler	Schindler
+@@ -259,6 +260,7 @@ seagate	Seagate Technology PLC
+ semtech	Semtech Corporation
+ sgx	SGX Sensortech
+ sharp	Sharp Corporation
++shinyei Shinyei Technology Co., Ltd
+ si-en	Si-En Technology Ltd.
+ sigma	Sigma Designs, Inc.
+ sii	Seiko Instruments, Inc.
+-- 
+2.11.1
+
